@@ -58,13 +58,13 @@ export default function HeroSection() {
             initial="hidden" animate="visible" variants={fadeUp} custom={3}
           >
             <Button asChild size="lg" className="h-12 px-8 text-base hero-gradient-bg border-0 text-primary-foreground hover:opacity-90 shadow-lg shadow-primary/20">
-              <Link to="/attend" className="gap-2">
+              <Link to="/attendance" className="gap-2">
                 Mark Attendance
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </Button>
             <Button asChild variant="outline" size="lg" className="h-12 px-8 text-base">
-              <Link to="/admin">View Events</Link>
+              <Link to="/attendance">Check Attendance Status</Link>
             </Button>
           </motion.div>
         </div>

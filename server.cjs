@@ -11,6 +11,7 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 5000;
 const SECRET_KEY = process.env.SECRET_KEY || 'your_secret_key_here';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 const PABBLY_WEBHOOK_URL = process.env.PABBLY_WEBHOOK_URL || 'YOUR_PABBLY_WEBHOOK_URL_HERE';
 
 // In-memory storage for duplicate checks: Map<eventId, Set<roll_no>>
@@ -22,6 +23,16 @@ const generateHMAC = (data) => {
 };
 
 // --- API Routes ---
+
+// Route to verify admin password
+app.post('/api/admin/login', (req, res) => {
+    const { password } = req.body;
+    if (password === ADMIN_PASSWORD) {
+        res.json({ success: true });
+    } else {
+        res.status(401).json({ error: 'Invalid password' });
+    }
+});
 
 // Route to get a signed token (Admin calls this)
 app.get('/api/token', (req, res) => {

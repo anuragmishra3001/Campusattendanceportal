@@ -25,10 +25,7 @@ export default function LandingHeader() {
 
         <div className="hidden md:flex items-center gap-2">
           <Button asChild variant="ghost" size="sm" className="text-nav-foreground/80 hover:text-nav-foreground hover:bg-nav-foreground/10">
-            <Link to="/attend">Mark Attendance</Link>
-          </Button>
-          <Button asChild size="sm" className="hero-gradient-bg border-0 text-primary-foreground hover:opacity-90">
-            <Link to="/admin">Admin Panel</Link>
+            <Link to="/attendance">Mark Attendance</Link>
           </Button>
         </div>
 
@@ -45,10 +42,7 @@ export default function LandingHeader() {
           <a href="#use-cases" className="block py-2 text-sm text-nav-foreground/70" onClick={() => setMobileOpen(false)}>Use Cases</a>
           <div className="flex flex-col gap-2 pt-2">
             <Button asChild size="sm" variant="outline" className="border-nav-foreground/20 text-nav-foreground">
-              <Link to="/attend">Mark Attendance</Link>
-            </Button>
-            <Button asChild size="sm" className="hero-gradient-bg border-0 text-primary-foreground">
-              <Link to="/admin">Admin Panel</Link>
+              <Link to="/attendance">Mark Attendance</Link>
             </Button>
           </div>
         </div>

@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { GraduationCap } from "lucide-react";
 
 export default function LandingFooter() {
@@ -16,6 +17,8 @@ export default function LandingFooter() {
             <a href="#" className="hover:text-nav-foreground/70 transition-colors">Privacy Policy</a>
             <span>|</span>
             <a href="#" className="hover:text-nav-foreground/70 transition-colors">Terms of Use</a>
+            <span>|</span>
+            <Link to="/admin" className="hover:text-nav-foreground/70 transition-colors opacity-30 hover:opacity-100">Admin Login</Link>
           </div>
           <p className="text-xs text-nav-foreground/30">© {new Date().getFullYear()} IKGPTU Attendance Portal</p>
         </div>

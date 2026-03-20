@@ -1,17 +1,50 @@
-import { useState, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { useState, useCallback, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { QRCodeDisplay } from "@/components/QRCodeDisplay";
 import { SessionControls } from "@/components/SessionControls";
 import { AttendanceLog, type AttendanceRecord } from "@/components/AttendanceLog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Download, Users, CheckCircle2, XCircle, QrCode, ArrowLeft } from "lucide-react";
+import { Download, Users, CheckCircle2, XCircle, QrCode, ArrowLeft, Lock, Loader2 } from "lucide-react";
 
 export default function AdminDashboard() {
   const [isActive, setIsActive] = useState(false);
   const [eventId, setEventId] = useState("");
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  
+  // Auth states
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [password, setPassword] = useState("");
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [loginError, setLoginError] = useState("");
+
+  const navigate = useNavigate();
+
+  const handleLogin = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setIsLoggingIn(true);
+    setLoginError("");
+
+    try {
+      const response = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+
+      if (response.ok) {
+        setIsAuthenticated(true);
+      } else {
+        setLoginError("Invalid admin password");
+      }
+    } catch (err) {
+      setLoginError("Connection error");
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
 
   const handleStart = useCallback((id: string) => {
     setEventId(id);
@@ -37,6 +70,43 @@ export default function AdminDashboard() {
 
   const verified = records.filter(r => r.status === "verified").length;
   const rejected = records.filter(r => r.status !== "verified").length;
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="mx-auto h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+              <Lock className="h-6 w-6 text-primary" />
+            </div>
+            <CardTitle className="text-2xl">Admin Login</CardTitle>
+            <p className="text-sm text-muted-foreground">Enter password to access dashboard</p>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-2">
+                <Input
+                  type="password"
+                  placeholder="Admin Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoFocus
+                />
+                {loginError && <p className="text-xs text-destructive">{loginError}</p>}
+              </div>
+              <Button type="submit" disabled={isLoggingIn || !password} className="w-full hero-gradient-bg border-0 text-primary-foreground">
+                {isLoggingIn ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Access Dashboard
+              </Button>
+              <Button variant="ghost" asChild className="w-full text-xs">
+                <Link to="/">Back to Home</Link>
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
