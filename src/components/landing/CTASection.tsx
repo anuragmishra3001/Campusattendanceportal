@@ -18,13 +18,13 @@ export default function CTASection() {
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center mt-8">
               <Button asChild size="lg" variant="secondary" className="h-12 px-8 font-semibold">
-                <Link to="/attend" className="gap-2">
+                <Link to="/attendance" className="gap-2">
                   Scan QR Now
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </Button>
               <Button asChild size="lg" variant="ghost" className="h-12 px-8 text-primary-foreground border border-primary-foreground/20 hover:bg-primary-foreground/10">
-                <Link to="/admin" className="gap-2">
+                <Link to="/attendance" className="gap-2">
                   <Search className="h-4 w-4" />
                   Check Attendance Status
                 </Link>

@@ -4,19 +4,23 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { parseAttendanceParams } from "@/lib/token";
-import { haversineDistance, DEFAULT_CAMPUS } from "@/lib/geo";
-import { MapPin, User, CheckCircle2, XCircle, Loader2, QrCode } from "lucide-react";
+import { MapPin, User, CheckCircle2, XCircle, Loader2, QrCode, Camera, Search } from "lucide-react";
+import { Html5QrcodeScanner } from "html5-qrcode";
 
-type Step = "identity" | "location" | "submitting" | "success" | "error";
+type Step = "scan" | "identity" | "location" | "submitting" | "success" | "error" | "status_check";
 
 interface LocationData { latitude: number; longitude: number; accuracy: number; }
 
 export default function StudentAttendance() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { eventId, token, timestamp } = parseAttendanceParams(searchParams.toString());
+  const initialParams = parseAttendanceParams(searchParams.toString());
 
-  const [step, setStep] = useState<Step>("identity");
+  const [step, setStep] = useState<Step>(initialParams.eventId ? "identity" : "scan");
+  const [activeEventId, setActiveEventId] = useState(initialParams.eventId || "");
+  const [activeToken, setActiveToken] = useState(initialParams.token || "");
+  const [activeTimestamp, setActiveTimestamp] = useState(initialParams.timestamp || 0);
+
   const [formData, setFormData] = useState({
     student_name: "",
     roll_no: "",
@@ -24,6 +28,12 @@ export default function StudentAttendance() {
     section: "",
     mobile_no: "",
   });
+
+  const [statusRollNo, setStatusRollNo] = useState("");
+  const [statusEventId, setStatusEventId] = useState("");
+  const [statusResult, setStatusResult] = useState<{ found: boolean; message: string } | null>(null);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
+
   const [location, setLocation] = useState<LocationData | null>(null);
   const [locationError, setLocationError] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
@@ -31,17 +41,53 @@ export default function StudentAttendance() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!eventId || !token || !timestamp) {
-      setStep("error");
-      setErrorMessage("Invalid or missing QR code data. Please scan a valid QR code from your admin.");
-    } else {
-      const age = (Date.now() - timestamp) / 1000;
+    if (step === "identity" && activeTimestamp) {
+      const age = (Date.now() - activeTimestamp) / 1000;
       if (age > 120) {
         setStep("error");
         setErrorMessage("This QR code has expired. Please scan the latest QR code.");
       }
     }
-  }, [eventId, token, timestamp]);
+  }, [step, activeTimestamp]);
+
+  useEffect(() => {
+    if (step === "scan") {
+      const scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: { width: 250, height: 250 } }, false);
+      scanner.render(
+        (decodedText) => {
+          try {
+            const url = new URL(decodedText);
+            const params = parseAttendanceParams(url.search);
+            if (params.eventId && params.token && params.timestamp) {
+              setActiveEventId(params.eventId);
+              setActiveToken(params.token);
+              setActiveTimestamp(params.timestamp);
+              scanner.clear();
+              setStep("identity");
+            }
+          } catch (e) {
+            console.error("Invalid QR Code");
+          }
+        },
+        (error) => { /* ignore */ }
+      );
+      return () => { scanner.clear(); };
+    }
+  }, [step]);
+
+  const handleStatusCheck = async () => {
+    if (!statusRollNo || !statusEventId) return;
+    setIsCheckingStatus(true);
+    try {
+      const response = await fetch(`/api/attendance/status?roll_no=${statusRollNo}&event_id=${statusEventId}`);
+      const data = await response.json();
+      setStatusResult({ found: data.found, message: data.message });
+    } catch (err) {
+      setStatusResult({ found: false, message: "Error checking status" });
+    } finally {
+      setIsCheckingStatus(false);
+    }
+  };
 
   const requestLocation = () => {
     setIsLocating(true);
@@ -74,7 +120,6 @@ export default function StudentAttendance() {
     if (!location || isSubmitting) return;
     setIsSubmitting(true);
     
-    // Preliminary frontend checks
     if (location.accuracy > 100) {
       setStep("error");
       setErrorMessage(`GPS accuracy too low (${Math.round(location.accuracy)}m). Please move to an open area and retry.`);
@@ -88,9 +133,9 @@ export default function StudentAttendance() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...formData,
-          event_id: eventId,
-          token: token,
-          timestamp: timestamp,
+          event_id: activeEventId,
+          token: activeToken,
+          timestamp: activeTimestamp,
           lat: location.latitude,
           lng: location.longitude,
           gps_accuracy: location.accuracy,
@@ -130,6 +175,53 @@ export default function StudentAttendance() {
     </div>
   );
 
+  if (step === "status_check") {
+    return cardWrapper(
+      <CardContent className="pt-6 pb-6 space-y-4">
+        <div className="flex flex-col items-center gap-3 text-center">
+          <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center">
+            <Search className="h-7 w-7 text-primary" />
+          </div>
+          <h2 className="text-lg font-bold text-foreground">Check Status</h2>
+          <p className="text-sm text-muted-foreground">Verify your attendance record</p>
+        </div>
+        <div className="space-y-3">
+          <Input placeholder="Roll Number" value={statusRollNo} onChange={e => setStatusRollNo(e.target.value)} />
+          <Input placeholder="Event ID" value={statusEventId} onChange={e => setStatusEventId(e.target.value)} />
+          <Button onClick={handleStatusCheck} disabled={isCheckingStatus || !statusRollNo || !statusEventId} className="w-full">
+            {isCheckingStatus ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} Check Record
+          </Button>
+        </div>
+        {statusResult && (
+          <div className={`p-4 rounded-lg text-center ${statusResult.found ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
+            <p className="font-bold">{statusResult.message}</p>
+          </div>
+        )}
+        <Button variant="ghost" onClick={() => setStep("scan")} className="w-full">Back to Scanner</Button>
+      </CardContent>
+    );
+  }
+
+  if (step === "scan") {
+    return cardWrapper(
+      <CardContent className="pt-6 pb-6 space-y-4">
+        <div className="flex flex-col items-center gap-3 text-center">
+          <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center">
+            <Camera className="h-7 w-7 text-primary" />
+          </div>
+          <h2 className="text-lg font-bold text-foreground">Scan QR Code</h2>
+          <p className="text-sm text-muted-foreground">Point your camera at the admin's QR</p>
+        </div>
+        <div id="reader" className="overflow-hidden rounded-lg border bg-muted"></div>
+        <div className="flex flex-col gap-2 pt-2">
+          <Button variant="outline" onClick={() => setStep("status_check")} className="w-full gap-2">
+            <Search className="h-4 w-4" /> Check Attendance Status
+          </Button>
+        </div>
+      </CardContent>
+    );
+  }
+
   if (step === "error") {
     return cardWrapper(
       <CardContent className="pt-8 pb-8 flex flex-col items-center gap-4 text-center">
@@ -138,7 +230,7 @@ export default function StudentAttendance() {
         </div>
         <h2 className="text-xl font-bold text-foreground">Attendance Failed</h2>
         <p className="text-muted-foreground text-sm">{errorMessage}</p>
-        <Button variant="outline" onClick={() => navigate("/")} className="mt-2">Go Back</Button>
+        <Button variant="outline" onClick={() => setStep("scan")} className="mt-2">Try Again</Button>
       </CardContent>
     );
   }
@@ -150,7 +242,7 @@ export default function StudentAttendance() {
           <CheckCircle2 className="h-8 w-8 text-success" />
         </div>
         <h2 className="text-xl font-bold text-foreground">Attendance Recorded!</h2>
-        <p className="text-muted-foreground text-sm">Your check-in for <span className="font-semibold text-foreground">{eventId}</span> has been verified.</p>
+        <p className="text-muted-foreground text-sm">Your check-in for <span className="font-semibold text-foreground">{activeEventId}</span> has been verified.</p>
         <Button variant="outline" onClick={() => navigate("/")} className="mt-2">Done</Button>
       </CardContent>
     );
@@ -213,7 +305,7 @@ export default function StudentAttendance() {
           <User className="h-7 w-7 text-primary" />
         </div>
         <h2 className="text-lg font-bold text-foreground">Student Check-in</h2>
-        <p className="text-sm text-muted-foreground">Event: <span className="font-semibold text-foreground">{eventId}</span></p>
+        <p className="text-sm text-muted-foreground">Event: <span className="font-semibold text-foreground">{activeEventId}</span></p>
       </div>
       <div className="space-y-3">
         <Input
@@ -249,6 +341,9 @@ export default function StudentAttendance() {
         className="w-full gap-2 hero-gradient-bg border-0 text-primary-foreground hover:opacity-90"
       >
         Continue
+      </Button>
+      <Button variant="ghost" onClick={() => setStep("scan")} className="w-full">
+        Scan Different QR
       </Button>
     </CardContent>
   );

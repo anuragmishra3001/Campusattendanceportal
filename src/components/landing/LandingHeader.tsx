@@ -40,9 +40,9 @@ export default function LandingHeader() {
           <a href="#how-it-works" className="block py-2 text-sm text-nav-foreground/70" onClick={() => setMobileOpen(false)}>How It Works</a>
           <a href="#features" className="block py-2 text-sm text-nav-foreground/70" onClick={() => setMobileOpen(false)}>Features</a>
           <a href="#use-cases" className="block py-2 text-sm text-nav-foreground/70" onClick={() => setMobileOpen(false)}>Use Cases</a>
-          <div className="flex flex-col gap-2 pt-2">
-            <Button asChild size="sm" variant="outline" className="border-nav-foreground/20 text-nav-foreground">
-              <Link to="/attendance">Mark Attendance</Link>
+          <div className="flex flex-col gap-2 pt-2 pb-4">
+            <Button asChild size="sm" variant="outline" className="border-nav-foreground/20 text-nav-foreground hover:bg-nav-foreground/10 bg-transparent">
+              <Link to="/attendance" onClick={() => setMobileOpen(false)}>Mark Attendance</Link>
             </Button>
           </div>
         </div>

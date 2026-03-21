@@ -12,9 +12,9 @@ app.use(express.json());
 const PORT = process.env.PORT || 5000;
 const SECRET_KEY = process.env.SECRET_KEY || 'your_secret_key_here';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
-const PABBLY_WEBHOOK_URL = process.env.PABBLY_WEBHOOK_URL || 'YOUR_PABBLY_WEBHOOK_URL_HERE';
+const PABBLY_WEBHOOK_URL = process.env.PABBLY_WEBHOOK_URL || 'https://connect.pabbly.com/workflow/sendwebhookdata/IjU3NjcwNTZmMDYzMjA0M2M1MjY0NTUzNDUxM2Ii_pc';
 
-// In-memory storage for duplicate checks: Map<eventId, Set<roll_no>>
+// In-memory storage: Map<eventId, Map<roll_no, fullRecord>>
 const attendanceStore = new Map();
 
 // Helper to generate HMAC
@@ -32,6 +32,40 @@ app.post('/api/admin/login', (req, res) => {
     } else {
         res.status(401).json({ error: 'Invalid password' });
     }
+});
+
+// Route to check attendance status
+app.get('/api/attendance/status', (req, res) => {
+    const { roll_no, event_id } = req.query;
+    if (!roll_no || !event_id) {
+        return res.status(400).json({ error: 'roll_no and event_id are required' });
+    }
+
+    const eventRecords = attendanceStore.get(event_id);
+    if (eventRecords && eventRecords.has(roll_no)) {
+        res.json({ found: true, message: 'Attendance Verified ✅' });
+    } else {
+        res.json({ found: false, message: 'Attendance Not Found ❌' });
+    }
+});
+
+// Route to get all records for an event (Admin Dashboard calls this)
+app.get('/api/admin/records', (req, res) => {
+    const { event_id, password } = req.query;
+    
+    // Simple protection: must provide admin password
+    if (password !== ADMIN_PASSWORD) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    if (!event_id) {
+        return res.status(400).json({ error: 'event_id is required' });
+    }
+
+    const eventRecordsMap = attendanceStore.get(event_id);
+    const records = eventRecordsMap ? Array.from(eventRecordsMap.values()) : [];
+    
+    res.json({ records });
 });
 
 // Route to get a signed token (Admin calls this)
@@ -91,18 +125,15 @@ app.post('/api/attendance', async (req, res) => {
 
     // 4. Duplicate Check (roll_no + event_id)
     if (!attendanceStore.has(event_id)) {
-        attendanceStore.set(event_id, new Set());
+        attendanceStore.set(event_id, new Map());
     }
     const eventRecords = attendanceStore.get(event_id);
     if (eventRecords.has(roll_no)) {
         return res.status(409).json({ error: 'Attendance already recorded for this event' });
     }
 
-    // 5. Save to Store
-    eventRecords.add(roll_no);
-
-    // 6. Send to Pabbly Webhook (Async)
-    const pabblyData = {
+    // 5. Save to Store (full record)
+    const fullRecord = {
         student_name,
         roll_no,
         course,
@@ -113,8 +144,13 @@ app.post('/api/attendance', async (req, res) => {
         checkin_time,
         lat,
         lng,
-        gps_accuracy
+        gps_accuracy,
+        status: 'verified'
     };
+    eventRecords.set(roll_no, fullRecord);
+
+    // 6. Send to Pabbly Webhook (Async)
+    const pabblyData = fullRecord;
 
     // Return success immediately to student
     res.json({ success: true, message: 'Attendance recorded successfully' });

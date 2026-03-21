@@ -63,9 +63,6 @@ export default function HeroSection() {
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </Button>
-            <Button asChild variant="outline" size="lg" className="h-12 px-8 text-base">
-              <Link to="/attendance">Check Attendance Status</Link>
-            </Button>
           </motion.div>
         </div>
       </div>

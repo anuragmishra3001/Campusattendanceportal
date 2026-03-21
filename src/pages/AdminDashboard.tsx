@@ -9,10 +9,22 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Download, Users, CheckCircle2, XCircle, QrCode, ArrowLeft, Lock, Loader2 } from "lucide-react";
 
+interface BackendRecord {
+  roll_no: string;
+  event_id: string;
+  checkin_time: string;
+  status: "verified" | "rejected" | "proxy_blocked" | "outside_range" | "duplicate";
+  lat: number;
+  lng: number;
+  gps_accuracy: number;
+  student_name: string;
+  course: string;
+  section: string;
+}
+
 export default function AdminDashboard() {
   const [isActive, setIsActive] = useState(false);
   const [eventId, setEventId] = useState("");
-  const [records, setRecords] = useState<AttendanceRecord[]>([]);
   
   // Auth states
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -46,6 +58,43 @@ export default function AdminDashboard() {
     }
   };
 
+  const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  
+  // Polling for new records
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isActive && eventId) {
+      const fetchRecords = async () => {
+        try {
+          const response = await fetch(`/api/admin/records?event_id=${eventId}&password=${password}`);
+          if (response.ok) {
+            const data = await response.json();
+            // Transform backend format to match frontend expectation if necessary
+            const mappedRecords = data.records.map((r: BackendRecord) => ({
+              studentId: r.roll_no,
+              eventId: r.event_id,
+              checkinTime: new Date(r.checkin_time).toLocaleTimeString(),
+              status: r.status,
+              lat: r.lat,
+              lng: r.lng,
+              accuracy: r.gps_accuracy,
+              studentName: r.student_name,
+              course: r.course,
+              section: r.section
+            }));
+            setRecords(mappedRecords);
+          }
+        } catch (err) {
+          console.error("Failed to fetch records:", err);
+        }
+      };
+
+      fetchRecords(); // Initial fetch
+      interval = setInterval(fetchRecords, 5000); // Poll every 5s
+    }
+    return () => { if (interval) clearInterval(interval); };
+  }, [isActive, eventId, password]);
+
   const handleStart = useCallback((id: string) => {
     setEventId(id);
     setIsActive(true);
@@ -56,9 +105,20 @@ export default function AdminDashboard() {
 
   const handleExportCSV = () => {
     if (records.length === 0) return;
-    const headers = ["Student ID", "Event ID", "Check-in Time", "Status", "Latitude", "Longitude", "Accuracy"];
-    const rows = records.map(r => [r.studentId, r.eventId, r.checkinTime, r.status, r.lat || "", r.lng || "", r.accuracy || ""]);
-    const csv = [headers, ...rows].map(row => row.join(",")).join("\n");
+    const headers = ["Student Name", "Roll Number", "Course", "Section", "Event ID", "Check-in Time", "Status", "Latitude", "Longitude", "Accuracy"];
+    const rows = records.map(r => [
+      r.studentName || "", 
+      r.studentId, 
+      r.course || "", 
+      r.section || "", 
+      r.eventId, 
+      r.checkinTime, 
+      r.status, 
+      r.lat || "", 
+      r.lng || "", 
+      r.accuracy ? `${Math.round(r.accuracy)}m` : ""
+    ]);
+    const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
