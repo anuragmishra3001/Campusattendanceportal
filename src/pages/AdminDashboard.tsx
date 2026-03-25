@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Download, Users, CheckCircle2, XCircle, QrCode, ArrowLeft, Lock, Loader2 } from "lucide-react";
+import { Download, Users, CheckCircle2, XCircle, QrCode, ArrowLeft, Lock, Loader2, Search, History } from "lucide-react";
 
 interface BackendRecord {
   roll_no: string;
@@ -20,6 +20,7 @@ interface BackendRecord {
   student_name: string;
   course: string;
   section: string;
+  created_at?: string;
 }
 
 export default function AdminDashboard() {
@@ -59,41 +60,64 @@ export default function AdminDashboard() {
   };
 
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
-  
-  // Polling for new records
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
+  const [dataSource, setDataSource] = useState<"memory" | "database" | null>(null);
+
+  const fetchRecords = useCallback(async (targetId: string) => {
+    if (!targetId) return;
+    try {
+      const response = await fetch(`/api/admin/records?event_id=${targetId}&password=${password}`);
+      if (response.ok) {
+        const data = await response.json();
+        setDataSource(data.source);
+        const mappedRecords = data.records.map((r: BackendRecord) => ({
+          studentId: r.roll_no,
+          eventId: r.event_id,
+          checkinTime: r.created_at 
+            ? new Date(r.created_at).toLocaleTimeString() 
+            : r.checkin_time,
+          status: r.status,
+          lat: r.lat,
+          lng: r.lng,
+          accuracy: r.gps_accuracy,
+          studentName: r.student_name,
+          course: r.course,
+          section: r.section
+        }));
+        setRecords(mappedRecords);
+      }
+    } catch (err) {
+      console.error("Failed to fetch records:", err);
+    }
+  }, [password]);
+
+  // Polling for active session
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    if (isActive && eventId) {
-      const fetchRecords = async () => {
-        try {
-          const response = await fetch(`/api/admin/records?event_id=${eventId}&password=${password}`);
-          if (response.ok) {
-            const data = await response.json();
-            // Transform backend format to match frontend expectation if necessary
-            const mappedRecords = data.records.map((r: BackendRecord) => ({
-              studentId: r.roll_no,
-              eventId: r.event_id,
-              checkinTime: new Date(r.checkin_time).toLocaleTimeString(),
-              status: r.status,
-              lat: r.lat,
-              lng: r.lng,
-              accuracy: r.gps_accuracy,
-              studentName: r.student_name,
-              course: r.course,
-              section: r.section
-            }));
-            setRecords(mappedRecords);
-          }
-        } catch (err) {
-          console.error("Failed to fetch records:", err);
-        }
-      };
-
-      fetchRecords(); // Initial fetch
-      interval = setInterval(fetchRecords, 5000); // Poll every 5s
+    if (isActive && eventId && !searchQuery) {
+      fetchRecords(eventId);
+      interval = setInterval(() => fetchRecords(eventId), 5000);
     }
     return () => { if (interval) clearInterval(interval); };
-  }, [isActive, eventId, password]);
+  }, [isActive, eventId, searchQuery, fetchRecords]);
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery) return;
+    setIsSearching(true);
+    await fetchRecords(searchQuery);
+    setIsSearching(false);
+  };
+
+  const handleClearSearch = () => {
+    setSearchQuery("");
+    if (isActive && eventId) {
+      fetchRecords(eventId);
+    } else {
+      setRecords([]);
+    }
+  };
 
   const handleStart = useCallback((id: string) => {
     setEventId(id);
@@ -241,8 +265,51 @@ export default function AdminDashboard() {
           </div>
 
           <div className="space-y-4">
-            <div className="flex justify-end">
-              <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={records.length === 0} className="gap-2">
+            <Card className="border-primary/20 shadow-sm overflow-hidden">
+              <CardHeader className="pb-3 bg-primary/5">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <History className="h-4 w-4 text-primary" />
+                  Search Attendance History
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <form onSubmit={handleSearch} className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Enter Event ID to fetch records..."
+                      className="pl-9"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                  </div>
+                  <Button type="submit" disabled={isSearching || !searchQuery} size="sm" className="gap-2">
+                    {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                    Search
+                  </Button>
+                  {searchQuery && (
+                    <Button type="button" variant="ghost" size="sm" onClick={handleClearSearch}>
+                      Clear
+                    </Button>
+                  )}
+                </form>
+                {searchQuery && dataSource && (
+                  <p className="text-[10px] text-muted-foreground mt-2 flex items-center gap-1">
+                    <Badge variant="outline" className="text-[10px] py-0 h-4">
+                      {dataSource === 'database' ? 'MySQL Database' : 'In-Memory'}
+                    </Badge>
+                    Showing results for: <span className="font-mono font-bold text-primary">{searchQuery}</span>
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            <div className="flex justify-between items-center">
+              <h3 className="text-sm font-semibold flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                {searchQuery ? 'Search Results' : 'Active Session Logs'}
+              </h3>
+              <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={records.length === 0} className="gap-2 shadow-sm">
                 <Download className="h-4 w-4" />
                 Export CSV
               </Button>
