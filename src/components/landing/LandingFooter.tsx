@@ -13,7 +13,7 @@ export default function LandingFooter() {
             <span className="font-bold">IKGPTU Attendance Portal</span>
           </div>
           <p className="text-sm text-nav-foreground/50">
-            Developed for IKGPTU Students by{" "}
+            Developed for IKGPTU by{" "}
             <a 
               href="https://www.linkedin.com/in/anurag-mishra-ptu" 
               target="_blank" 
