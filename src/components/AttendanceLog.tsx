@@ -15,6 +15,7 @@ export interface AttendanceRecord {
   studentName?: string;
   course?: string;
   section?: string;
+  mobileNo?: string;
 }
 
 const statusConfig: Record<AttendanceRecord["status"], { label: string; className: string }> = {
@@ -47,6 +48,7 @@ export function AttendanceLog({ records }: AttendanceLogProps) {
                 <TableRow>
                   <TableHead className="font-semibold">Student Name</TableHead>
                   <TableHead className="font-semibold">Roll No</TableHead>
+                  <TableHead className="font-semibold">Mobile No</TableHead>
                   <TableHead className="font-semibold">Time</TableHead>
                   <TableHead className="font-semibold">Status</TableHead>
                   <TableHead className="font-semibold">Course/Sec</TableHead>
@@ -66,6 +68,7 @@ export function AttendanceLog({ records }: AttendanceLogProps) {
                       <TableRow key={record.studentId + index}>
                         <TableCell className="font-medium text-sm">{record.studentName || "N/A"}</TableCell>
                         <TableCell className="text-sm">{record.studentId}</TableCell>
+                        <TableCell className="text-sm">{record.mobileNo || "N/A"}</TableCell>
                         <TableCell className="text-muted-foreground text-xs">
                           {record.checkinTime}
                         </TableCell>

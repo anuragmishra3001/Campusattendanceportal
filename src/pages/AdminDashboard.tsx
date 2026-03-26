@@ -17,6 +17,7 @@ interface BackendRecord {
   lat: number;
   lng: number;
   gps_accuracy: number;
+  mobile_no: string;
   student_name: string;
   course: string;
   section: string;
@@ -82,9 +83,10 @@ export default function AdminDashboard() {
           lng: r.lng,
           accuracy: r.gps_accuracy,
           studentName: r.student_name,
-          course: r.course,
-          section: r.section
-        }));
+              course: r.course,
+              section: r.section,
+              mobileNo: r.mobile_no
+            }));
         setRecords(mappedRecords);
       }
     } catch (err) {
@@ -129,10 +131,11 @@ export default function AdminDashboard() {
 
   const handleExportCSV = () => {
     if (records.length === 0) return;
-    const headers = ["Student Name", "Roll Number", "Course", "Section", "Event ID", "Check-in Time", "Status", "Latitude", "Longitude", "Accuracy"];
+    const headers = ["Student Name", "Roll Number", "Mobile No", "Course", "Section", "Event ID", "Check-in Time", "Status", "Latitude", "Longitude", "Accuracy"];
     const rows = records.map(r => [
       r.studentName || "", 
       r.studentId, 
+      r.mobileNo || "",
       r.course || "", 
       r.section || "", 
       r.eventId, 
