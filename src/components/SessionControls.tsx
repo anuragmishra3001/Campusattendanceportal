@@ -26,9 +26,9 @@ export function SessionControls({ isActive, eventId, onStart, onStop }: SessionC
       (err) => {
         console.error("Location error:", err);
         setIsGettingLocation(false);
-        alert("Failed to get location. Please ensure GPS is enabled.");
+        alert("Failed to get location. Please ensure Location services are enabled in your Windows/Browser settings.");
       },
-      { enableHighAccuracy: true }
+      { enableHighAccuracy: false, timeout: 10000 }
     );
   };
 
