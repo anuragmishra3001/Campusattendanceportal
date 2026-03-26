@@ -6,6 +6,22 @@ const path = require('path');
 const mysql = require('mysql2/promise');
 require('dotenv').config();
 
+// Helper for distance calculation
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371e3; // Earth radius in meters
+    const φ1 = lat1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180;
+    const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c; // Distance in meters
+}
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -33,8 +49,10 @@ const initDB = async () => {
             }
         });
 
-        // Create table if it doesn't exist
+        // Create tables if they don't exist
         const connection = await pool.getConnection();
+        
+        // Main attendance records table
         await connection.query(`
             CREATE TABLE IF NOT EXISTS attendance (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -54,8 +72,21 @@ const initDB = async () => {
                 UNIQUE KEY unique_attendance (roll_no, event_id)
             )
         `);
+
+        // Event sessions table to store venue location
+        await connection.query(`
+            CREATE TABLE IF NOT EXISTS event_sessions (
+                event_id VARCHAR(100) PRIMARY KEY,
+                venue_lat DECIMAL(10, 8),
+                venue_lng DECIMAL(11, 8),
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            )
+        `);
+        
         connection.release();
-        console.log('✅ MySQL Connected & Table Ready');
+        console.log('✅ MySQL Connected & Tables Ready');
     } catch (err) {
         console.error('❌ MySQL Connection Failed:', err.message);
         console.log('⚠️ Falling back to In-Memory storage only');
@@ -152,9 +183,24 @@ app.get('/api/admin/records', async (req, res) => {
 });
 
 // Route to get a signed token (Admin calls this)
-app.get('/api/token', (req, res) => {
-    const { event_id } = req.query;
+app.get('/api/token', async (req, res) => {
+    const { event_id, lat, lng } = req.query;
     if (!event_id) return res.status(400).json({ error: 'event_id is required' });
+
+    // Store event session location if provided
+    if (pool && lat && lng) {
+        try {
+            await pool.query(
+                `INSERT INTO event_sessions (event_id, venue_lat, venue_lng, is_active) 
+                 VALUES (?, ?, ?, TRUE) 
+                 ON DUPLICATE KEY UPDATE venue_lat = ?, venue_lng = ?, is_active = TRUE`,
+                [event_id, lat, lng, lat, lng]
+            );
+            console.log(`📍 Venue set for ${event_id}: ${lat}, ${lng}`);
+        } catch (err) {
+            console.error('MySQL Error on session update:', err.message);
+        }
+    }
 
     const timestamp = Date.now();
     const payload = `${event_id}:${timestamp}`;
@@ -204,6 +250,30 @@ app.post('/api/attendance', async (req, res) => {
     // 3. GPS Validation (Accuracy <= 100m)
     if (gps_accuracy > 100) {
         return res.status(400).json({ error: 'GPS accuracy too low' });
+    }
+
+    // 3.1 Venue Proximity Check (100m Geofence)
+    if (pool) {
+        try {
+            const [sessions] = await pool.query(
+                'SELECT venue_lat, venue_lng FROM event_sessions WHERE event_id = ? AND is_active = TRUE',
+                [event_id]
+            );
+            
+            if (sessions.length > 0) {
+                const venue = sessions[0];
+                const distance = calculateDistance(lat, lng, venue.venue_lat, venue.venue_lng);
+                console.log(`📏 Student distance from venue: ${Math.round(distance)}m`);
+                
+                if (distance > 100) {
+                    return res.status(403).json({ 
+                        error: `Out of range. You must be within 100m of the venue. Your distance: ${Math.round(distance)}m` 
+                    });
+                }
+            }
+        } catch (err) {
+            console.error('MySQL Error on venue check:', err.message);
+        }
     }
 
     // 4. Duplicate Check (roll_no + event_id)

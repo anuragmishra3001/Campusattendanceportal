@@ -121,10 +121,17 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleStart = useCallback((id: string) => {
+  const handleStart = useCallback((id: string, lat?: number, lng?: number) => {
     setEventId(id);
     setIsActive(true);
     setRecords([]);
+    // Update token to include location if available
+    const url = new URL(window.location.origin + "/api/token");
+    url.searchParams.append("event_id", id);
+    if (lat) url.searchParams.append("lat", lat.toString());
+    if (lng) url.searchParams.append("lng", lng.toString());
+    
+    fetch(url.toString()).catch(err => console.error("Failed to set venue location:", err));
   }, []);
 
   const handleStop = useCallback(() => setIsActive(false), []);

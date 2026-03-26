@@ -2,20 +2,40 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Play, Square, Settings } from "lucide-react";
+import { Play, Square, Settings, MapPin, Loader2 } from "lucide-react";
 
 interface SessionControlsProps {
   isActive: boolean;
   eventId: string;
-  onStart: (eventId: string) => void;
+  onStart: (eventId: string, lat?: number, lng?: number) => void;
   onStop: () => void;
 }
 
 export function SessionControls({ isActive, eventId, onStart, onStop }: SessionControlsProps) {
   const [inputEventId, setInputEventId] = useState(eventId || "");
+  const [venueLocation, setVenueLocation] = useState<{lat: number, lng: number} | null>(null);
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
+
+  const getVenueLocation = () => {
+    setIsGettingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setVenueLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setIsGettingLocation(false);
+      },
+      (err) => {
+        console.error("Location error:", err);
+        setIsGettingLocation(false);
+        alert("Failed to get location. Please ensure GPS is enabled.");
+      },
+      { enableHighAccuracy: true }
+    );
+  };
 
   const handleStart = () => {
-    if (inputEventId.trim()) onStart(inputEventId.trim());
+    if (inputEventId.trim()) {
+      onStart(inputEventId.trim(), venueLocation?.lat, venueLocation?.lng);
+    }
   };
 
   return (
@@ -33,6 +53,18 @@ export function SessionControls({ isActive, eventId, onStart, onStop }: SessionC
           onChange={e => setInputEventId(e.target.value)}
           disabled={isActive}
         />
+        {!isActive && (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={getVenueLocation} 
+            disabled={isGettingLocation}
+            className="w-full gap-2 border-primary/20 hover:bg-primary/5 text-primary"
+          >
+            {isGettingLocation ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
+            {venueLocation ? "Location Set (100m Geofence Active)" : "Set Venue Location (Optional Geofence)"}
+          </Button>
+        )}
         {!isActive ? (
           <Button onClick={handleStart} disabled={!inputEventId.trim()} className="w-full gap-2 hero-gradient-bg border-0 text-primary-foreground hover:opacity-90">
             <Play className="h-4 w-4" />
