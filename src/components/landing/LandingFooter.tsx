@@ -12,7 +12,17 @@ export default function LandingFooter() {
             </div>
             <span className="font-bold">IKGPTU Attendance Portal</span>
           </div>
-          <p className="text-sm text-nav-foreground/50">Developed for IKGPTU Students</p>
+          <p className="text-sm text-nav-foreground/50">
+            Developed for IKGPTU Students by{" "}
+            <a 
+              href="https://www.linkedin.com/in/anurag-mishra-ptu" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-primary hover:underline font-medium transition-colors"
+            >
+              Anurag Mishra
+            </a>
+          </p>
           <div className="flex items-center gap-4 text-xs text-nav-foreground/40">
             <a href="#" className="hover:text-nav-foreground/70 transition-colors">Privacy Policy</a>
             <span>|</span>
