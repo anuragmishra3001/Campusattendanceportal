@@ -166,7 +166,7 @@ export default function StudentAttendance() {
           <div className="h-8 w-8 rounded-lg hero-gradient-bg flex items-center justify-center">
             <QrCode className="h-4 w-4 text-primary-foreground" />
           </div>
-          <span className="font-bold">CampusCheck</span>
+          <span className="font-bold">IKGPTU Attendance Portal</span>
         </div>
       </header>
       <div className="flex-1 flex items-center justify-center p-4">

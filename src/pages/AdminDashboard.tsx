@@ -206,7 +206,7 @@ export default function AdminDashboard() {
             <div className="h-8 w-8 rounded-lg hero-gradient-bg flex items-center justify-center">
               <QrCode className="h-4 w-4 text-primary-foreground" />
             </div>
-            <h1 className="font-bold text-sm sm:text-lg truncate">CampusCheck</h1>
+            <h1 className="font-bold text-sm sm:text-lg truncate">IKGPTU Attendance Portal</h1>
           </div>
           <Badge variant="outline" className="border-nav-foreground/20 text-nav-foreground shrink-0 hidden sm:inline-flex">
             Admin Dashboard
