@@ -73,6 +73,11 @@ const generateHMAC = (data) => {
 
 // --- API Routes ---
 
+// Health check endpoint for keeping the server awake
+app.get('/api/ping', (req, res) => {
+    res.json({ status: 'alive', timestamp: new Date().toISOString() });
+});
+
 // Route to verify admin password
 app.post('/api/admin/login', (req, res) => {
     const { password } = req.body;
