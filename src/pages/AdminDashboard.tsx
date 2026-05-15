@@ -21,6 +21,7 @@ interface BackendRecord {
   student_name: string;
   course: string;
   section: string;
+  device_id: string;
   created_at?: string;
 }
 
@@ -85,7 +86,8 @@ export default function AdminDashboard() {
           studentName: r.student_name,
               course: r.course,
               section: r.section,
-              mobileNo: r.mobile_no
+              mobileNo: r.mobile_no,
+              deviceId: r.device_id
             }));
         setRecords(mappedRecords);
       }
@@ -138,13 +140,14 @@ export default function AdminDashboard() {
 
   const handleExportCSV = () => {
     if (records.length === 0) return;
-    const headers = ["Student Name", "Roll Number", "Mobile No", "Course", "Section", "Event ID", "Check-in Time", "Status", "Latitude", "Longitude", "Accuracy"];
+    const headers = ["Student Name", "Roll Number", "Mobile No", "Course", "Section", "Device ID", "Event ID", "Check-in Time", "Status", "Latitude", "Longitude", "Accuracy"];
     const rows = records.map(r => [
       r.studentName || "", 
       r.studentId, 
       r.mobileNo || "",
       r.course || "", 
       r.section || "", 
+      r.deviceId || "",
       r.eventId, 
       r.checkinTime, 
       r.status, 

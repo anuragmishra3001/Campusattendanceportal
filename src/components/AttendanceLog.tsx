@@ -16,6 +16,7 @@ export interface AttendanceRecord {
   course?: string;
   section?: string;
   mobileNo?: string;
+  deviceId?: string;
 }
 
 const statusConfig: Record<AttendanceRecord["status"], { label: string; className: string }> = {

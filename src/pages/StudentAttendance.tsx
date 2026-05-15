@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { parseAttendanceParams } from "@/lib/token";
 import { MapPin, User, CheckCircle2, XCircle, Loader2, QrCode, Camera, Search } from "lucide-react";
 import { Html5QrcodeScanner } from "html5-qrcode";
+import FingerprintJS from '@fingerprintjs/fingerprintjs';
 
 type Step = "scan" | "identity" | "location" | "submitting" | "success" | "error" | "status_check";
 
@@ -39,6 +40,17 @@ export default function StudentAttendance() {
   const [errorMessage, setErrorMessage] = useState("");
   const [isLocating, setIsLocating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deviceId, setDeviceId] = useState<string>("");
+
+  useEffect(() => {
+    // Initialize fingerprinting
+    const setFp = async () => {
+      const fp = await FingerprintJS.load();
+      const result = await fp.get();
+      setDeviceId(result.visitorId);
+    };
+    setFp();
+  }, []);
 
   useEffect(() => {
     if (step === "identity" && activeTimestamp) {
@@ -117,7 +129,13 @@ export default function StudentAttendance() {
   };
 
   const handleSubmit = async () => {
-    if (!location || isSubmitting) return;
+    if (!location || isSubmitting || !deviceId) {
+      if (!deviceId) {
+        setErrorMessage("Device fingerprinting is still initializing. Please wait a second and try again.");
+        setStep("error");
+      }
+      return;
+    }
     setIsSubmitting(true);
     
     if (location.accuracy > 100) {
@@ -134,6 +152,7 @@ export default function StudentAttendance() {
         body: JSON.stringify({
           ...formData,
           event_id: activeEventId,
+          device_id: deviceId,
           token: activeToken,
           timestamp: activeTimestamp,
           lat: location.latitude,

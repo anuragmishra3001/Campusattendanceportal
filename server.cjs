@@ -62,6 +62,7 @@ const initDB = async () => {
                 section VARCHAR(50),
                 mobile_no VARCHAR(20),
                 event_id VARCHAR(100) NOT NULL,
+                device_id VARCHAR(255),
                 event_date DATE,
                 checkin_time TIME,
                 lat DECIMAL(10, 8),
@@ -72,6 +73,17 @@ const initDB = async () => {
                 UNIQUE KEY unique_attendance (roll_no, event_id)
             )
         `);
+
+        // Migration: Add device_id column if it doesn't exist
+        try {
+            const [columns] = await connection.query('SHOW COLUMNS FROM attendance LIKE "device_id"');
+            if (columns.length === 0) {
+                await connection.query('ALTER TABLE attendance ADD COLUMN device_id VARCHAR(255) AFTER event_id');
+                console.log('✅ Added device_id column to attendance table');
+            }
+        } catch (err) {
+            console.error('⚠️ Migration error (adding device_id):', err.message);
+        }
 
         // Event sessions table to store venue location
         await connection.query(`
@@ -219,6 +231,7 @@ app.post('/api/attendance', async (req, res) => {
         section,
         mobile_no,
         event_id,
+        device_id,
         token,
         timestamp,
         lat,
@@ -229,7 +242,7 @@ app.post('/api/attendance', async (req, res) => {
     } = req.body;
 
     // 1. Basic Validation
-    if (!student_name || !roll_no || !event_id || !token || !timestamp) {
+    if (!student_name || !roll_no || !event_id || !token || !timestamp || !device_id) {
         return res.status(400).json({ error: 'Missing required fields' });
     }
 
@@ -276,15 +289,26 @@ app.post('/api/attendance', async (req, res) => {
         }
     }
 
-    // 4. Duplicate Check (roll_no + event_id)
+    // 4. Duplicate Check (roll_no + event_id AND device_id + event_id)
     if (pool) {
         try {
-            const [existing] = await pool.query(
+            // Check for roll_no duplication
+            const [existingRoll] = await pool.query(
                 'SELECT id FROM attendance WHERE roll_no = ? AND event_id = ?',
                 [roll_no, event_id]
             );
-            if (existing.length > 0) {
-                return res.status(409).json({ error: 'Attendance already recorded for this event (DB)' });
+            if (existingRoll.length > 0) {
+                return res.status(409).json({ error: 'Attendance already recorded for this event (Roll No)' });
+            }
+
+            // One Device Per Event Restriction Check
+            // This prevents multiple students from using the same device for the same event
+            const [existingDevice] = await pool.query(
+                'SELECT id FROM attendance WHERE device_id = ? AND event_id = ?',
+                [device_id, event_id]
+            );
+            if (existingDevice.length > 0) {
+                return res.status(403).json({ error: 'This device has already been used for attendance in this event.' });
             }
         } catch (err) {
             console.error('MySQL Error on duplicate check:', err.message);
@@ -296,7 +320,13 @@ app.post('/api/attendance', async (req, res) => {
     }
     const eventRecords = attendanceStore.get(event_id);
     if (eventRecords.has(roll_no)) {
-        return res.status(409).json({ error: 'Attendance already recorded for this event (Memory)' });
+        return res.status(409).json({ error: 'Attendance already recorded for this event (Roll No - Memory)' });
+    }
+
+    // Check for device_id in memory fallback
+    const alreadyUsedDevice = Array.from(eventRecords.values()).find(r => r.device_id === device_id);
+    if (alreadyUsedDevice) {
+        return res.status(403).json({ error: 'This device has already been used for attendance in this event (Memory).' });
     }
 
     // 5. Save to Store (full record)
@@ -307,6 +337,7 @@ app.post('/api/attendance', async (req, res) => {
         section,
         mobile_no,
         event_id,
+        device_id,
         event_date,
         checkin_time,
         lat,
@@ -319,11 +350,11 @@ app.post('/api/attendance', async (req, res) => {
     if (pool) {
         try {
             await pool.query(
-                `INSERT INTO attendance (student_name, roll_no, course, section, mobile_no, event_id, event_date, checkin_time, lat, lng, gps_accuracy, status) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [student_name, roll_no, course, section, mobile_no, event_id, event_date, checkin_time, lat, lng, gps_accuracy, 'verified']
+                `INSERT INTO attendance (student_name, roll_no, course, section, mobile_no, event_id, device_id, event_date, checkin_time, lat, lng, gps_accuracy, status) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [student_name, roll_no, course, section, mobile_no, event_id, device_id, event_date, checkin_time, lat, lng, gps_accuracy, 'verified']
             );
-            console.log(`✅ Saved to MySQL: ${roll_no}`);
+            console.log(`✅ Saved to MySQL: ${roll_no} (Device: ${device_id})`);
         } catch (err) {
             console.error('❌ Failed to save to MySQL:', err.message);
         }
